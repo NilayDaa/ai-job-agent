@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 import sqlite3
+from fastapi import Query
+from app.services.search import search_jobs
 
 router = APIRouter()
 
@@ -25,3 +27,7 @@ def get_jobs():
         }
         for r in rows
     ]
+
+@router.get("/search")
+def search(query: str = Query(...)):
+    return search_jobs(query)

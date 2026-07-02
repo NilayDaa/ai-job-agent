@@ -53,24 +53,6 @@ def scrape_jobs(max_pages=2):
     return jobs
 
 
-def save_jobs_to_db(jobs):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    for job in jobs:
-        cursor.execute("""
-            INSERT OR IGNORE INTO jobs (title, company, location, link)
-            VALUES (?, ?, ?, ?)
-        """, (
-            job["title"],
-            job["company"],
-            job["location"],
-            job["link"]
-        ))
-
-    conn.commit()
-    conn.close()
-
 
 def save_jobs_json(jobs):
     with open("data/jobs.json", "w", encoding="utf-8") as f:
