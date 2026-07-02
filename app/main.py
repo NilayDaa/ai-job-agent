@@ -1,11 +1,11 @@
 from fastapi import FastAPI
+from app.api.jobs import router as jobs_router
 
 app = FastAPI()
 
+app.include_router(jobs_router)
+
+
 @app.get("/")
 def home():
-    return {"message": "AI Job Agent is running"}
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+    return {"message": "AI Job Agent running"}

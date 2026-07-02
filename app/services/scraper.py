@@ -1,5 +1,6 @@
 import json
 from playwright.sync_api import sync_playwright
+from app.core.database import get_connection, init_db
 
 
 SEARCH_URL = "https://duunitori.fi/tyopaikat?haku=siivooja"
@@ -18,49 +19,70 @@ def scrape_jobs(max_pages=2):
 
             page.goto(url, timeout=60000)
 
-            # IMPORTANT: wait for network + content
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(2000)
+            # IMPORTANT: wait for JS rendering
+            page.wait_for_timeout(5000)
 
-            # DEBUG: check if page has content
             print("Page title:", page.title())
 
-            # More generic selector (safer)
-            cards = page.locator("a[href*='/tyopaikat/']")
+            # 🔥 NEW APPROACH: grab all links from page
+            links = page.eval_on_selector_all(
+                "a",
+                "elements => elements.map(e => ({text: e.innerText, href: e.href}))"
+            )
 
-            count = cards.count()
-            print(f"Found links: {count}")
+            page_jobs = 0
 
-            for j in range(count):
-                el = cards.nth(j)
+            for l in links:
+                text = l.get("text", "").strip()
+                href = l.get("href", "")
 
-                title = safe_text(el)
-                link = el.get_attribute("href")
-
-                if title and link:
+                # filter job-like links
+                if "/tyopaikat/" in href and len(text) > 10:
                     jobs.append({
-                        "title": title,
-                        "link": f"https://duunitori.fi{link}" if link.startswith("/") else link
+                        "title": text,
+                        "company": "Unknown",
+                        "location": "Unknown",
+                        "link": href
                     })
+                    page_jobs += 1
+
+            print(f"Found jobs this page: {page_jobs}")
 
         browser.close()
 
     return jobs
 
 
-def safe_text(element):
-    try:
-        return element.inner_text().strip()
-    except:
-        return None
+def save_jobs_to_db(jobs):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    for job in jobs:
+        cursor.execute("""
+            INSERT OR IGNORE INTO jobs (title, company, location, link)
+            VALUES (?, ?, ?, ?)
+        """, (
+            job["title"],
+            job["company"],
+            job["location"],
+            job["link"]
+        ))
+
+    conn.commit()
+    conn.close()
 
 
-def save_jobs(jobs):
+def save_jobs_json(jobs):
     with open("data/jobs.json", "w", encoding="utf-8") as f:
         json.dump(jobs, f, indent=2, ensure_ascii=False)
 
 
 if __name__ == "__main__":
+    init_db()
+
     jobs = scrape_jobs()
-    save_jobs(jobs)
-    print(f"Scraped {len(jobs)} jobs from Duunitori")
+
+    save_jobs_json(jobs)
+    save_jobs_to_db(jobs)
+
+    print(f"Scraped total: {len(jobs)} jobs")
