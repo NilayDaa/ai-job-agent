@@ -2,8 +2,9 @@ from fastapi import APIRouter
 import sqlite3
 from fastapi import Query
 from app.services.search import search_jobs
-from fastapi import Query
 from app.services.semantic_search import semantic_search
+from app.agents.job_agent import job_agent
+
 
 router = APIRouter()
 
@@ -40,3 +41,7 @@ def semantic_search_endpoint(
     k: int = 10
 ):
     return semantic_search.search(q, k)
+
+@router.get("/agent-search")
+def agent_search(query: str = Query(...)):
+    return job_agent.search_jobs(query)

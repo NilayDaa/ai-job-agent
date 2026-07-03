@@ -1,0 +1,18 @@
+SEARCH_TERMS = [
+    "siivooja",
+    "cleaner",
+    "driver",
+    "kuljettaja",
+    "warehouse",
+    "varasto",
+    "software",
+    "developer",
+    "python",
+    "backend",
+    "frontend",
+    "fullstack",
+    "AI",
+    "data",
+    "intern",
+    "harjoittelu",
+]

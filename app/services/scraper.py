@@ -1,70 +1,92 @@
 import json
 from playwright.sync_api import sync_playwright
-from app.core.database import get_connection, init_db
 
+from app.config import SEARCH_TERMS
 
-SEARCH_URL = "https://duunitori.fi/tyopaikat?haku=siivooja"
+BASE_URL = "https://duunitori.fi/tyopaikat"
 
 
 def scrape_jobs(max_pages=2):
-    jobs = []
+    """
+    Scrape jobs from multiple search terms.
+    Duplicate jobs are removed using the job URL.
+    """
+
+    jobs = {}
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        for i in range(max_pages):
-            url = f"{SEARCH_URL}&sivu={i+1}"
-            print(f"Scraping: {url}")
+        for term in SEARCH_TERMS:
 
-            page.goto(url, timeout=60000)
+            print("\n" + "=" * 60)
+            print(f"Searching: {term}")
+            print("=" * 60)
 
-            # IMPORTANT: wait for JS rendering
-            page.wait_for_timeout(5000)
+            for page_number in range(1, max_pages + 1):
 
-            print("Page title:", page.title())
+                url = f"{BASE_URL}?haku={term}&sivu={page_number}"
 
-            # 🔥 NEW APPROACH: grab all links from page
-            links = page.eval_on_selector_all(
-                "a",
-                "elements => elements.map(e => ({text: e.innerText, href: e.href}))"
-            )
+                print(f"Scraping: {url}")
 
-            page_jobs = 0
+                try:
+                    page.goto(url, timeout=60000)
 
-            for l in links:
-                text = l.get("text", "").strip()
-                href = l.get("href", "")
+                    page.wait_for_load_state("networkidle")
+                    page.wait_for_timeout(3000)
 
-                # filter job-like links
-                if "/tyopaikat/" in href and len(text) > 10:
-                    jobs.append({
-                        "title": text,
-                        "company": "Unknown",
-                        "location": "Unknown",
-                        "link": href
-                    })
-                    page_jobs += 1
+                    print("Page title:", page.title())
 
-            print(f"Found jobs this page: {page_jobs}")
+                    links = page.eval_on_selector_all(
+                        "a",
+                        """
+                        elements => elements.map(e => ({
+                            text: e.innerText,
+                            href: e.href
+                        }))
+                        """
+                    )
+
+                    page_jobs = 0
+
+                    for link in links:
+
+                        title = link.get("text", "").strip()
+                        href = link.get("href", "").strip()
+
+                        if not href:
+                            continue
+
+                        if "/tyopaikat/" not in href:
+                            continue
+
+                        if len(title) < 5:
+                            continue
+
+                        jobs[href] = {
+                            "title": title,
+                            "company": "Unknown",
+                            "location": "Unknown",
+                            "link": href,
+                            "search_term": term,
+                        }
+
+                        page_jobs += 1
+
+                    print(f"Found jobs this page: {page_jobs}")
+
+                except Exception as e:
+                    print(f"Error scraping {url}")
+                    print(e)
 
         browser.close()
 
-    return jobs
+    print(f"\nUnique jobs collected: {len(jobs)}")
 
+    return list(jobs.values())
 
 
 def save_jobs_json(jobs):
     with open("data/jobs.json", "w", encoding="utf-8") as f:
-        json.dump(jobs, f, indent=2, ensure_ascii=False)
-
-
-if __name__ == "__main__":
-    init_db()
-
-    jobs = scrape_jobs()
-
-    save_jobs_json(jobs)
-    save_jobs_to_db(jobs)
-
-    print(f"Scraped total: {len(jobs)} jobs")
+        json.dump(jobs, f, indent=4, ensure_ascii=False)
