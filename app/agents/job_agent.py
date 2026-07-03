@@ -1,4 +1,5 @@
 from app.services.semantic_search import semantic_search
+from app.services.llm_service import llm
 
 
 class JobAgent:
@@ -25,11 +26,33 @@ class JobAgent:
 
     def generate_reason(self, job, request):
 
-        return (
-            f"This job matches your search "
-            f"'{request}' with a similarity score "
-            f"of {job['score']:.3f}."
-        )
+        prompt = f"""
+    You are an AI career assistant.
 
+    User request:
+    {request}
+
+    Job title:
+    {job['title']}
+
+    Company:
+    {job['company']}
+
+    Location:
+    {job['location']}
+
+    Explain in 2-3 sentences why this job could match the user's request.
+    """
+
+        response = llm.generate(prompt)
+
+        if response:
+            return response
+
+        return (
+            f"This job matches your request "
+            f"'{request}' with similarity score "
+            f"{job['score']:.3f}."
+    )
 
 job_agent = JobAgent()
