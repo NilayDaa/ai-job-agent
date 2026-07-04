@@ -3,9 +3,8 @@ import os
 from fastapi import APIRouter, UploadFile, File
 
 from app.services.cv_parser import cv_parser
-from app.services.cv_matcher import cv_matcher
 from app.services.skill_extractor import extract_skills
-from app.services.career_analyzer import career_analyzer
+from app.agents.job_agent import job_agent
 
 router = APIRouter()
 
@@ -24,18 +23,19 @@ async def match_cv(file: UploadFile = File(...)):
     # Extract skills
     skills = extract_skills(cv_text)
 
-    # Find matching jobs
-    jobs = cv_matcher.match(cv_text)
+    # Match CV against jobs using the AI Agent
+    jobs = job_agent.match_cv(cv_text)
 
-    # AI career analysis
-    analysis = career_analyzer.analyze(
+    # Generate AI career analysis
+    analysis = job_agent.analyze(
         cv_text=cv_text,
         skills=skills,
         jobs=jobs
     )
 
-    # Delete uploaded file
-    os.remove(filepath)
+    # Remove uploaded file
+    if os.path.exists(filepath):
+        os.remove(filepath)
 
     return {
         "cv_summary": {

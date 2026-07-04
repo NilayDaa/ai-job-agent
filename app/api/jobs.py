@@ -1,10 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 import sqlite3
-from fastapi import Query
-from app.services.search import search_jobs
-from app.services.semantic_search import semantic_search
-from app.agents.job_agent import job_agent
 
+from app.services.search import search_jobs
+from app.agents.job_agent import job_agent
 
 router = APIRouter()
 
@@ -31,17 +29,14 @@ def get_jobs():
         for r in rows
     ]
 
+
+# Optional: Keep keyword search for comparison
 @router.get("/search")
-def search(query: str = Query(...)):
+def keyword_search(query: str = Query(...)):
     return search_jobs(query)
 
-@router.get("/semantic-search")
-def semantic_search_endpoint(
-    q: str = Query(..., description="Search query"),
-    k: int = 10
-):
-    return semantic_search.search(q, k)
 
-@router.get("/agent-search")
-def agent_search(query: str = Query(...)):
-    return job_agent.search_jobs(query)
+# Main search endpoint (uses the AI Agent)
+@router.get("/semantic-search")
+def semantic_search(query: str = Query(...), k: int = 10):
+    return job_agent.search_jobs(query, k)
