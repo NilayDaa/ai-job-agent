@@ -10,9 +10,10 @@ def save_jobs(jobs):
     for job in jobs:
         try:
             cursor.execute("""
-                INSERT OR IGNORE INTO jobs
+                INSERT INTO jobs
                 (title, company, location, link)
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (link) DO NOTHING
             """, (
                 job.get("title"),
                 job.get("company", "Unknown"),
@@ -27,6 +28,8 @@ def save_jobs(jobs):
             print(e)
 
     conn.commit()
+
+    cursor.close()
     conn.close()
 
     return inserted
@@ -42,6 +45,8 @@ def get_all_jobs():
     """)
 
     rows = cursor.fetchall()
+
+    cursor.close()
     conn.close()
 
     return rows

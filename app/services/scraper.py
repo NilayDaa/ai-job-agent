@@ -1,6 +1,7 @@
 import json
 from playwright.sync_api import sync_playwright
-
+from app.core.database import init_db
+from app.repositories.jobs_repository import save_jobs
 from app.config import SEARCH_TERMS
 
 BASE_URL = "https://duunitori.fi/tyopaikat"
@@ -90,3 +91,20 @@ def scrape_jobs(max_pages=2):
 def save_jobs_json(jobs):
     with open("data/jobs.json", "w", encoding="utf-8") as f:
         json.dump(jobs, f, indent=4, ensure_ascii=False)
+
+
+def main():
+    init_db()
+
+    jobs = scrape_jobs(max_pages=2)
+
+    save_jobs_json(jobs)
+
+    inserted = save_jobs(jobs)
+
+    print(f"\nScraped: {len(jobs)} jobs")
+    print(f"Inserted: {inserted} new jobs")
+
+
+if __name__ == "__main__":
+    main()
