@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from jose import jwt
+from jose import jwt, JWTError
 
 SECRET_KEY = "change-this-in-production"
 ALGORITHM = "HS256"
@@ -23,6 +23,20 @@ class JWTService:
             SECRET_KEY,
             algorithm=ALGORITHM
         )
+
+    def verify_token(self, token: str):
+
+        try:
+            payload = jwt.decode(
+                token,
+                SECRET_KEY,
+                algorithms=[ALGORITHM]
+            )
+
+            return payload
+
+        except JWTError:
+            return None
 
 
 jwt_service = JWTService()

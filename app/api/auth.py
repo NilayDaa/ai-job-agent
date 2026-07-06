@@ -10,6 +10,8 @@ from app.repositories.user_repository import (
 
 from app.services.auth_service import auth_service
 from app.services.jwt_service import jwt_service
+from fastapi import Depends
+from app.core.security import get_current_user
 
 router = APIRouter()
 
@@ -84,3 +86,7 @@ def login(request: LoginRequest):
         "access_token": token,
         "token_type": "bearer"
     }
+
+@router.get("/me")
+def me(current_user=Depends(get_current_user)):
+    return current_user

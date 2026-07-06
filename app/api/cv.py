@@ -5,12 +5,14 @@ from fastapi import APIRouter, UploadFile, File
 from app.services.cv_parser import cv_parser
 from app.services.skill_extractor import extract_skills
 from app.agents.job_agent import job_agent
+from fastapi import Depends
+from app.core.security import get_current_user
 
 router = APIRouter()
 
 
 @router.post("/match-cv")
-async def match_cv(file: UploadFile = File(...)):
+async def match_cv(file: UploadFile = File(...), current_user=Depends(get_current_user)):
 
     filepath = f"uploads/{file.filename}"
 

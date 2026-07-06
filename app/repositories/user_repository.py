@@ -85,3 +85,28 @@ def get_user_by_email(email):
         "email": row[2],
         "password_hash": row[3]
     }
+
+def get_user_by_id(user_id):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, username, email
+        FROM users
+        WHERE id = %s
+    """, (user_id,))
+
+    row = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    if row is None:
+        return None
+
+    return {
+        "id": row[0],
+        "username": row[1],
+        "email": row[2],
+    }
