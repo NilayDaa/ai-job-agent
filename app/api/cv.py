@@ -7,6 +7,8 @@ from app.services.skill_extractor import extract_skills
 from app.agents.job_agent import job_agent
 from fastapi import Depends
 from app.core.security import get_current_user
+from app.repositories.cv_repository import save_user_cv
+from app.repositories.cv_repository import get_user_cv
 
 router = APIRouter()
 
@@ -18,6 +20,11 @@ async def match_cv(file: UploadFile = File(...), current_user=Depends(get_curren
 
     with open(filepath, "wb") as buffer:
         buffer.write(await file.read())
+        save_user_cv(
+            user_id=current_user["id"],
+            filename=file.filename,
+            filepath=filepath
+        )
 
     # Extract CV text
     cv_text = cv_parser.extract_text(filepath)
@@ -48,3 +55,15 @@ async def match_cv(file: UploadFile = File(...), current_user=Depends(get_curren
         "recommendations": jobs,
         "career_analysis": analysis
     }
+
+@router.get("/my-cv")
+def my_cv(current_user=Depends(get_current_user)):
+
+    cv = get_user_cv(current_user["id"])
+
+    if cv is None:
+        return {
+            "message": "No CV uploaded yet"
+        }
+
+    return cv

@@ -30,7 +30,18 @@ def init_db():
         )
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_cv(
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL,
+        filepath TEXT NOT NULL,
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     conn.commit()
 
     cursor.close()
     conn.close()
+
