@@ -46,5 +46,22 @@ services:
     volumes:
       - ./uploads:/app/uploads
 
+  worker:
+    build: .
+
+    container_name: ai-job-worker
+
+    depends_on:
+      - redis
+      - postgres
+
+    env_file:
+      - .env
+
+    command: python -m app.worker
+
+    volumes:
+      - ./uploads:/app/uploads
+
 volumes:
   postgres_data:

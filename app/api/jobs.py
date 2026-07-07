@@ -3,6 +3,8 @@ from fastapi import APIRouter, Query
 from app.services.search import search_jobs
 from app.agents.job_agent import job_agent
 from app.repositories.jobs_repository import get_all_jobs
+from app.services.queue import job_queue
+from app.jobs.scraper_jobs import scrape_jobs_background
 
 router = APIRouter()
 
@@ -33,3 +35,15 @@ def keyword_search(query: str = Query(...)):
 @router.get("/semantic-search")
 def semantic_search(query: str = Query(...), k: int = 10):
     return job_agent.search_jobs(query, k)
+
+@router.post("/scrape")
+def scrape():
+
+    job = job_queue.enqueue(
+        scrape_jobs_background
+    )
+
+    return {
+        "message": "Scraping job queued",
+        "job_id": job.id
+    }
