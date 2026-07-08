@@ -63,5 +63,21 @@ services:
     volumes:
       - ./uploads:/app/uploads
 
+  scheduler:
+    build: .
+
+    container_name: ai-job-scheduler
+
+    depends_on:
+      - redis
+
+    env_file:
+      - .env
+
+    command: python -m app.scheduler
+
+    volumes:
+      - ./uploads:/app/uploads
+
 volumes:
   postgres_data:
