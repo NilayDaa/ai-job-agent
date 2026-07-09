@@ -59,16 +59,17 @@ class VectorStore:
         return results
 
     def save(self):
-        """
-        Save index and job mapping.
-        """
-
         INDEX_DIR.mkdir(exist_ok=True)
+
+        print("Saving index to:", INDEX_FILE.resolve())
+        print("Saving mapping to:", MAPPING_FILE.resolve())
 
         faiss.write_index(self.index, str(INDEX_FILE))
 
         with open(MAPPING_FILE, "wb") as f:
             pickle.dump(self.job_mapping, f)
+
+        print("Saved", len(self.job_mapping), "jobs")
 
     def load(self):
         """
@@ -84,3 +85,18 @@ class VectorStore:
             self.job_mapping = pickle.load(f)
 
         return True
+    
+    def rebuild(self, jobs: list):
+        print("========== REBUILD ==========")
+        print("Jobs received:", len(jobs))
+
+        if jobs:
+            print("First job:", jobs[0])
+
+        self.build_index(jobs)
+
+        print("Vectors in index:", self.index.ntotal)
+
+        self.save()
+
+        print("========== DONE ==========")

@@ -1,35 +1,52 @@
 from app.repositories.jobs_repository import get_all_jobs
 from app.services.embeddings import create_embedding
 from app.services.vector_store import VectorStore
-import json
-
 from app.services.cache import cache
 
+import json
+
+
 class SemanticSearchService:
+
     def __init__(self):
         self.vector_store = VectorStore()
+        self.reload()
 
-        # Try loading an existing index
-        if not self.vector_store.load():
-            print("No existing vector index found. Building a new one...")
+    def reload(self):
+        """
+        Load the latest vector index from disk.
+        If it doesn't exist, build it from the database.
+        """
 
-            rows = get_all_jobs()
+        print("Loading vector index...")
 
-            jobs = []
+        if self.vector_store.load():
+            print(
+                f"Loaded {len(self.vector_store.job_mapping)} vectors."
+            )
+            return
 
-            for row in rows:
-                jobs.append({
+        print("No vector index found. Building a new one...")
+
+        rows = get_all_jobs()
+
+        jobs = []
+
+        for row in rows:
+            jobs.append(
+                {
                     "id": row[0],
                     "title": row[1],
                     "company": row[2],
                     "location": row[3],
                     "link": row[4],
-                })
+                }
+            )
 
-            self.vector_store.build_index(jobs)
-            self.vector_store.save()
+        self.vector_store.build_index(jobs)
+        self.vector_store.save()
 
-            print(f"Indexed {len(jobs)} jobs.")
+        print(f"Indexed {len(jobs)} jobs.")
 
     def search(self, query: str, k: int = 10):
 
@@ -45,7 +62,10 @@ class SemanticSearchService:
 
         query_embedding = create_embedding(query)
 
-        results = self.vector_store.search(query_embedding, k)
+        results = self.vector_store.search(
+            query_embedding,
+            k
+        )
 
         cache.setex(
             cache_key,
@@ -54,5 +74,6 @@ class SemanticSearchService:
         )
 
         return results
+
 
 semantic_search = SemanticSearchService()
