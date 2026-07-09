@@ -45,6 +45,7 @@ services:
 
     volumes:
       - ./uploads:/app/uploads
+      - ./data:/app/data
 
   worker:
     build: .

@@ -1,8 +1,9 @@
-venv/
-__pycache__/
-.git/
-.pytest_cache/
+.git
+.gitignore
+venv
+__pycache__
 *.pyc
-*.pyo
-*.pyd
 .env
+node_modules
+uploads/*
+data/*
