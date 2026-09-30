@@ -6,7 +6,7 @@ from app.services.scraper import scrape_jobs, save_jobs_json
 def main():
     init_db()
 
-    jobs = scrape_jobs(max_pages=2)
+    jobs = scrape_jobs(max_pages=5)
 
     save_jobs_json(jobs)
 

@@ -16,7 +16,7 @@ def scrape_jobs_background():
 
                 logger.info(f"Scraping attempt {attempt}")
 
-                jobs = scrape_jobs(max_pages=2)
+                jobs = scrape_jobs(max_pages=5)
 
                 inserted = save_jobs(jobs)
 
