@@ -1,126 +1,282 @@
 import json
+from urllib.parse import urljoin
 
 from playwright.sync_api import sync_playwright
 
 from app.core.database import init_db
 from app.repositories.jobs_repository import save_jobs
-from app.config import SEARCH_TERMS
 from app.services.vector_store import VectorStore
 from app.repositories.jobs_repository import get_all_jobs
 from app.services.semantic_search import semantic_search
 from app.services.cache import cache
 
 
-BASE_URL = "https://duunitori.fi/tyopaikat"
+BASE_URL = "https://tyomarkkinatori.fi"
+
+VACANCIES_URL = (
+    "https://tyomarkkinatori.fi/en/personal-customers/vacancies"
+)
 
 
-def scrape_jobs(max_pages=2):
+def extract_vacancies(page, jobs):
+
+    links = page.locator(
+        'h3 a[href*="/en/personal-customers/vacancies/"]'
+    )
+
+    count = links.count()
+
+    print(f"Vacancies found on page: {count}")
+
+    page_jobs = 0
+
+    for i in range(count):
+
+        try:
+
+            link = links.nth(i)
+
+            title = link.inner_text().strip()
+
+            href = link.get_attribute("href") or ""
+
+            if not title or not href:
+                continue
+
+            href = urljoin(
+                BASE_URL,
+                href
+            )
+
+            # Avoid duplicates
+            if href in jobs:
+                continue
+
+            # Find vacancy card
+            card = link.locator(
+                "xpath=ancestor::div[h3][1]"
+            )
+
+            if card.count() == 0:
+                continue
+
+            # -------------------------
+            # COMPANY
+            # -------------------------
+
+            company = "Unknown"
+
+            company_items = card.locator(
+                "ul li"
+            )
+
+            if company_items.count() > 0:
+
+                company = (
+                    company_items
+                    .nth(0)
+                    .inner_text()
+                    .strip()
+                )
+
+            # -------------------------
+            # LOCATION
+            # -------------------------
+
+            location = "Unknown"
+
+            location_icon = card.locator(
+                'svg[data-icon="location"]'
+            )
+
+            if location_icon.count() > 0:
+
+                try:
+
+                    location = (
+                        location_icon
+                        .locator("xpath=../..")
+                        .inner_text()
+                        .strip()
+                    )
+
+                except Exception:
+                    pass
+
+            # -------------------------
+            # SAVE
+            # -------------------------
+
+            jobs[href] = {
+                "title": title,
+                "company": company,
+                "location": location,
+                "link": href,
+            }
+
+            print(
+                f"Found: {title} | "
+                f"{company} | "
+                f"{location}"
+            )
+
+            page_jobs += 1
+
+        except Exception as e:
+
+            print(
+                f"Card error at index {i}: {e}"
+            )
+
+    print(
+        f"New jobs collected from this page: "
+        f"{page_jobs}"
+    )
+
+
+def scrape_jobs(max_pages=5):
 
     jobs = {}
 
     with sync_playwright() as p:
 
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True
+        )
 
         page = browser.new_page()
 
-        for term in SEARCH_TERMS:
+        for page_number in range(
+            1,
+            max_pages + 1
+        ):
 
-            print("\n" + "=" * 60)
-            print(f"Searching: {term}")
-            print("=" * 60)
+            print("\n" + "=" * 70)
 
-            for page_number in range(1, max_pages + 1):
+            print(
+                f"SCRAPING PAGE "
+                f"{page_number}/{max_pages}"
+            )
 
-                search_url = (
-                    f"{BASE_URL}"
-                    f"?haku={term}"
-                    f"&sivu={page_number}"
+            print("=" * 70)
+
+            # --------------------------------
+            # Työmarkkinatori pagination
+            # --------------------------------
+            #
+            # Page 1:
+            # ?p=1
+            #
+            # Page 2:
+            # ?p=2
+            #
+            # Page 3:
+            # ?p=3
+            #
+            # etc.
+            #
+            # --------------------------------
+
+            current_url = (
+                f"{VACANCIES_URL}"
+                f"?p={page_number}"
+            )
+
+            print(
+                "URL:",
+                current_url
+            )
+
+            response = page.goto(
+                current_url,
+                timeout=60000,
+                wait_until="networkidle"
+            )
+
+            # --------------------------------
+            # HTTP status
+            # --------------------------------
+
+            if response:
+
+                print(
+                    "HTTP:",
+                    response.status
                 )
 
-                print("Scraping:", search_url)
+                if response.status >= 400:
 
-                try:
-
-                    page.goto(
-                        search_url,
-                        timeout=60000,
-                        wait_until="domcontentloaded"
+                    raise RuntimeError(
+                        f"HTTP error: "
+                        f"{response.status}"
                     )
 
-                    page.wait_for_timeout(3000)
+            # --------------------------------
+            # Page information
+            # --------------------------------
 
-                    print("Page title:", page.title())
+            print(
+                "TITLE:",
+                page.title()
+            )
 
-                    cards = page.locator("div.job-box")
+            # --------------------------------
+            # Wait for vacancy listings
+            # --------------------------------
 
-                    page_jobs = 0
+            page.wait_for_selector(
+                'h3 a[href*="/en/personal-customers/vacancies/"]',
+                timeout=30000
+            )
 
-                    for i in range(cards.count()):
+            vacancy_count = page.locator(
+                'h3 a[href*="/en/personal-customers/vacancies/"]'
+            ).count()
 
-                        try:
+            if vacancy_count == 0:
 
-                            card = cards.nth(i)
+                print(
+                    "No vacancies found. "
+                    "Stopping."
+                )
 
-                            link = card.locator(
-                                "a.job-box__hover.gtm-search-result"
-                            ).first
+                break
 
-                            if link.count() == 0:
-                                continue
+            # --------------------------------
+            # Extract jobs
+            # --------------------------------
 
-                            title = link.inner_text().strip()
+            extract_vacancies(
+                page,
+                jobs
+            )
 
-                            href = link.get_attribute("href") or ""
-
-                            if not href:
-                                continue
-
-                            if href.startswith("/"):
-                                href = "https://duunitori.fi" + href
-
-                            company = (
-                                link.get_attribute("data-company")
-                                or "Unknown"
-                            ).strip()
-
-                            try:
-                                location = (
-                                    card
-                                    .locator("span.job-box__job-location")
-                                    .inner_text()
-                                    .strip()
-                                )
-                            except:
-                                location = "Unknown"
-
-                            if href in jobs:
-                                continue
-
-                            jobs[href] = {
-                                "title": title,
-                                "company": company,
-                                "location": location,
-                                "link": href,
-                                "search_term": term,
-                            }
-
-                            print(f"Found: {title}")
-
-                            page_jobs += 1
-
-                        except Exception as e:
-                            print("Card error:", e)
-
-                    print(f"Found jobs this page: {page_jobs}")
-
-                except Exception as e:
-
-                    print("Search error:", e)
+            print(
+                f"TOTAL UNIQUE JOBS SO FAR: "
+                f"{len(jobs)}"
+            )
 
         browser.close()
 
-    print(f"\nUnique jobs collected: {len(jobs)}")
+    # --------------------------------
+    # Final result
+    # --------------------------------
+
+    print("\n" + "=" * 70)
+
+    print(
+        f"TOTAL UNIQUE JOBS: "
+        f"{len(jobs)}"
+    )
+
+    print("=" * 70)
+
+    if not jobs:
+
+        raise RuntimeError(
+            "Työmarkkinatori scraper "
+            "returned 0 jobs."
+        )
 
     return list(jobs.values())
 
@@ -143,18 +299,46 @@ def save_jobs_json(jobs):
 
 def main():
 
+    # --------------------------------
+    # Initialize database
+    # --------------------------------
+
     init_db()
 
-    jobs = scrape_jobs(max_pages=2)
+    # --------------------------------
+    # Scrape 5 pages
+    # --------------------------------
 
-    save_jobs_json(jobs)
+    jobs = scrape_jobs(
+        max_pages=5
+    )
 
-    inserted = save_jobs(jobs)
+    # --------------------------------
+    # Save JSON
+    # --------------------------------
+
+    save_jobs_json(
+        jobs
+    )
+
+    # --------------------------------
+    # Save to PostgreSQL
+    # --------------------------------
+
+    inserted = save_jobs(
+        jobs
+    )
+
+    # --------------------------------
+    # Get ALL jobs from database
+    # --------------------------------
+
     rows = get_all_jobs()
 
     all_jobs = []
 
     for row in rows:
+
         all_jobs.append(
             {
                 "id": row[0],
@@ -165,13 +349,39 @@ def main():
             }
         )
 
-    VectorStore().rebuild(all_jobs)
+    # --------------------------------
+    # Rebuild vector index
+    # --------------------------------
+
+    VectorStore().rebuild(
+        all_jobs
+    )
+
+    # --------------------------------
+    # Clear Redis cache
+    # --------------------------------
+
     cache.flushdb()
+
+    # --------------------------------
+    # Reload semantic search
+    # --------------------------------
 
     semantic_search.reload()
 
-    print(f"\nScraped: {len(jobs)} jobs")
-    print(f"Inserted: {inserted} new jobs")
+    # --------------------------------
+    # Final statistics
+    # --------------------------------
+
+    print(
+        f"\nScraped: "
+        f"{len(jobs)} jobs"
+    )
+
+    print(
+        f"Inserted: "
+        f"{inserted} new jobs"
+    )
 
 
 if __name__ == "__main__":
