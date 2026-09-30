@@ -67,11 +67,12 @@ class SemanticSearchService:
             k
         )
 
-        cache.setex(
-            cache_key,
-            3600,
-            json.dumps(results)
-        )
+        if results:
+            cache.setex(
+                cache_key,
+                3600,
+                json.dumps(results)
+            )
 
         return results
 
